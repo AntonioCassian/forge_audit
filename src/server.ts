@@ -24,7 +24,7 @@ const startServer = async (): Promise<void> => {
     // 1. Conectar MongoDB
     await connectMongoDB();
 
-    console.log('MongoDB conectado!');
+    console.log('MongoDB conectado!!!');
 
     // 2. Conectar PostgreSQL
     await connectPostgres.query('SELECT NOW()');

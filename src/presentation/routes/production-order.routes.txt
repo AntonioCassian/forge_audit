@@ -1,0 +1,131 @@
+
+import { Router } from "express";
+
+// Controller
+import { ProductionOrderController } from "../controllers/production-order/ProductionOrderController.js";
+
+// Middlewares
+import { AuthMiddleware } from "../middlewares/AuthMiddleware.js";
+import { createAuditMiddleware } from "../middlewares/AuditMiddleware.js";
+
+// Database
+import connectPostgres from "../../infra/database/postgres/postgres.js";
+
+// Repositories
+import { PgProductionOrderRepository } from "../../infra/database/repositories/pg-production-order-repository.js";
+import { MongoAuditLogRepository } from "../../infra/repositories/MongoAuditLogRepository.js";
+
+// Use Cases
+import { CreateProductionOrderUseCase } from "../../core/use-cases/produto_order/CreateProductionOrderUseCase.js";
+import { UpdateProductionOrderStatusUseCase } from "../../core/use-cases/produto_order/update-producto-order.js";
+import { GetProductionOrderByIdUseCase } from "../../core/use-cases/produto_order/get_production_order_byid_use_case.js";
+import { GetAllProductionOrdersUseCase } from "../../core/use-cases/produto_order/getall_production_orders_usecase.js";
+import { DeleteProductionOrderUseCase } from "../../core/use-cases/produto_order/delete_production_order_use_case.js";
+import { PgMachineRepository } from "../../infra/database/repositories/pg-machine-repository.js";
+
+const productionOrderRoutes = Router();
+
+// ========================================
+// REPOSITORY
+// ========================================
+
+const productionOrderRepository = new PgProductionOrderRepository(
+  connectPostgres
+);
+
+const machineRepository = new PgMachineRepository(
+  connectPostgres
+);
+
+// ========================================
+// USE CASES
+// ========================================
+
+const createProductionOrderUseCase =
+  new CreateProductionOrderUseCase(productionOrderRepository);
+
+const updateProductionOrderStatusUseCase =
+  new UpdateProductionOrderStatusUseCase(
+    productionOrderRepository as any,
+    machineRepository as any
+  );
+
+const getProductionOrderByIdUseCase =
+  new GetProductionOrderByIdUseCase(productionOrderRepository);
+
+const getAllProductionOrdersUseCase =
+  new GetAllProductionOrdersUseCase(productionOrderRepository);
+
+const deleteProductionOrderUseCase =
+  new DeleteProductionOrderUseCase(productionOrderRepository);
+
+// ========================================
+// CONTROLLER
+// ========================================
+
+const productionOrderController = new ProductionOrderController(
+  createProductionOrderUseCase,
+  updateProductionOrderStatusUseCase,
+  getProductionOrderByIdUseCase,
+  getAllProductionOrdersUseCase,
+  deleteProductionOrderUseCase
+);
+
+// ========================================
+// AUDIT MIDDLEWARE
+// ========================================
+
+const productionOrderAuditMiddleware = createAuditMiddleware({
+  resource: "ordem_producao",
+
+  getOldValues: (id) =>
+    productionOrderRepository.findById(id),
+
+  saveAudit: (data) =>
+    MongoAuditLogRepository.create(data),
+});
+
+// ========================================
+// AUTHENTICATION
+// ========================================
+
+productionOrderRoutes.use(AuthMiddleware);
+
+// ========================================
+// ROUTES
+// ========================================
+
+// POST - Criar ordem de produção
+productionOrderRoutes.post(
+  "/",
+  productionOrderAuditMiddleware,
+  productionOrderController.create.bind(productionOrderController)
+);
+
+// GET - Listar ordens de produção
+productionOrderRoutes.get(
+  "/",
+  productionOrderController.findAll.bind(productionOrderController)
+);
+
+// GET - Buscar ordem por ID
+productionOrderRoutes.get(
+  "/:id",
+  productionOrderController.findById.bind(productionOrderController)
+);
+
+// PATCH - Atualizar status
+productionOrderRoutes.patch(
+  "/:id/status",
+  productionOrderAuditMiddleware,
+  productionOrderController.updateStatus.bind(productionOrderController)
+);
+
+// DELETE - Excluir ordem
+productionOrderRoutes.delete(
+  "/:id",
+  productionOrderAuditMiddleware,
+  productionOrderController.delete.bind(productionOrderController)
+);
+
+export default productionOrderRoutes;

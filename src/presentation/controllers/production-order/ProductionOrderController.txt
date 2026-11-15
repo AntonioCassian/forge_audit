@@ -1,0 +1,126 @@
+
+import type { Request, Response } from "express";
+import type { UpdateProductionOrderStatusUseCase } from "../../../core/use-cases/produto_order/update-producto-order.js";
+import type { GetProductionOrderByIdUseCase } from "../../../core/use-cases/produto_order/get_production_order_byid_use_case.js";
+import type { GetAllProductionOrdersUseCase } from "../../../core/use-cases/produto_order/getall_production_orders_usecase.js";
+import type { DeleteProductionOrderUseCase } from "../../../core/use-cases/produto_order/delete_production_order_use_case.js";
+import type { CreateProductionOrderUseCase } from "../../../core/use-cases/produto_order/CreateProductionOrderUseCase.js";
+
+
+export class ProductionOrderController {
+  static create: any;
+    static findAll: any;
+    static findById: any;
+    static updateStatus: any;
+    static delete: any;
+  constructor(
+    private createProductionOrderUseCase: CreateProductionOrderUseCase,
+    private updateProductionOrderStatusUseCase: UpdateProductionOrderStatusUseCase,
+    private getProductionOrderByIdUseCase: GetProductionOrderByIdUseCase,
+    private getAllProductionOrdersUseCase: GetAllProductionOrdersUseCase,
+    private deleteProductionOrderUseCase: DeleteProductionOrderUseCase
+  ) {}
+
+  async create(req: Request, res: Response): Promise<Response> {
+    try {
+      await this.createProductionOrderUseCase.execute(req.body);
+
+      return res.status(201).json({
+        message: "Ordem de produção criada com sucesso.",
+      });
+    } catch (error) {
+      return res.status(400).json({
+        message: error instanceof Error ? error.message : "Erro ao criar ordem.",
+      });
+    }
+  }
+
+  async findById(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+
+      if (typeof id !== "string" || id.trim().length === 0) {
+        return res.status(400).json({ error: "Um ID válido da ordem de produção é obrigatório." });
+      }
+
+      const productionOrder =
+        await this.getProductionOrderByIdUseCase.execute(id);
+
+      return res.status(200).json(productionOrder);
+    } catch (error) {
+      return res.status(404).json({
+        message: error instanceof Error ? error.message : "Erro ao buscar ordem.",
+      });
+    }
+  }
+
+  async findAll(req: Request, res: Response): Promise<Response> {
+    try {
+      const productionOrders =
+        await this.getAllProductionOrdersUseCase.execute();
+
+      return res.status(200).json(productionOrders);
+    } catch (error) {
+      return res.status(500).json({
+        message: "Erro ao listar ordens de produção.",
+      });
+    }
+  }
+
+  async updateStatus(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (typeof id !== "string" || id.trim().length === 0) {
+        return res.status(400).json({ error: "Um ID válido da ordem de produção é obrigatório." });
+      }
+
+      const validStatuses = [
+        "PLANNED",
+        "IN_PROGRESS",
+        "SUSPENDED",
+        "COMPLETED",
+      ];
+
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message: "Status de ordem de produção inválido.",
+        });
+      }
+
+      await this.updateProductionOrderStatusUseCase.execute({
+        productionOrderId: id,
+        status,
+      });
+
+      return res.status(200).json({
+        message: "Status atualizado com sucesso.",
+      });
+    } catch (error) {
+      return res.status(400).json({
+        message: error instanceof Error ? error.message : "Erro ao atualizar status.",
+      });
+    }
+  }
+
+  async delete(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+
+      if (typeof id !== "string" || id.trim().length === 0) {
+        return res.status(400).json({ error: "Um ID válido da ordem de produção é obrigatório." });
+      }
+
+      await this.deleteProductionOrderUseCase.execute(id);
+
+      return res.status(200).json({
+        message: "Ordem de produção excluída com sucesso.",
+      });
+    } catch (error) {
+      return res.status(400).json({
+        message: error instanceof Error ? error.message : "Erro ao excluir ordem.",
+      });
+    }
+  }
+}

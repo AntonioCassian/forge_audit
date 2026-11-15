@@ -7,7 +7,9 @@
     "dev": "tsx watch ./src/server.ts",
     "seed": "tsx ./src/infra/database/postgres/seed.ts",
     "db:migrate": "tsx ./src/infra/database/postgres/run_migrations.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "node dist/presentation/server.js"
   },
   "keywords": [],
   "author": "",

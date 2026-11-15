@@ -1,6 +1,6 @@
 import type { UserRole } from "./usuarios.js";
 
-export type AuditEntity = "ordem_producao" | "equipamento";
+export type AuditEntity = "ordem_producao" | "equipamento" | "users";
 
 export interface AuditLogProps {
   id?: string;

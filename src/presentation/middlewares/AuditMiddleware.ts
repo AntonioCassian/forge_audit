@@ -6,33 +6,24 @@ import type {
   RequestHandler,
 } from "express";
 
+import { AuditLog } from "../../core/entitties/audit-log.js";
+import type { AuditEntity } from "../../core/entitties/audit-log.js";
+import type { UserRole } from "../../core/entitties/usuarios.js";
+
 interface AuthenticatedUser {
   id: string;
   email: string;
-  role: string;
+  role: UserRole;
 }
 
 type AuthenticatedRequest = Request & {
   user?: AuthenticatedUser;
 };
 
-interface AuditData {
-  userId: string;
-  userEmail: string;
-  userRole: string;
-  action: string;
-  resource: string;
-  resourceId: string | null;
-  ip: string | undefined;
-  timestamp: Date;
-  oldValues: unknown;
-  newValues: unknown;
-}
-
 interface AuditMiddlewareDependencies {
   getOldValues: (id: string) => Promise<unknown>;
-  saveAudit: (data: AuditData) => Promise<void>;
-  resource: string;
+  saveAudit: (data: AuditLog) => Promise<void>;
+  resource: AuditEntity;
 }
 
 export function createAuditMiddleware({
@@ -47,13 +38,11 @@ export function createAuditMiddleware({
     next: NextFunction
   ): Promise<void> {
 
-    // 1. Verifica o método HTTP
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
       return next();
     }
 
     try {
-      // 2. Recupera o usuário autenticado
       const user = (req as AuthenticatedRequest).user;
 
       if (!user) {
@@ -63,13 +52,11 @@ export function createAuditMiddleware({
         return;
       }
 
-      // 3. Recupera o ID do recurso
       const resourceId =
         typeof req.params.id === "string"
           ? req.params.id
           : null;
 
-      // 4. Captura os dados antigos
       let oldValues: unknown = null;
 
       if (
@@ -79,18 +66,14 @@ export function createAuditMiddleware({
         oldValues = await getOldValues(resourceId);
       }
 
-      // 5. Guarda a função original do Express
       const originalJson = res.json.bind(res);
 
       let auditStarted = false;
 
-      // 6. Intercepta a resposta JSON
       res.json = ((body: unknown) => {
 
-        // Envia a resposta original
         const response = originalJson(body);
 
-        // Verifica se a operação foi bem-sucedida
         if (
           res.statusCode >= 200 &&
           res.statusCode < 300 &&
@@ -98,21 +81,24 @@ export function createAuditMiddleware({
         ) {
           auditStarted = true;
 
-          const auditData: AuditData = {
+          const auditLog = new AuditLog({
             userId: user.id,
-            userEmail: user.email,
-            userRole: user.role,
+            userName: user.email,
+            role: user.role,
+            sourceIp: req.ip ?? "unknown",
+            dateTime: new Date(),
             action: req.method,
-            resource,
-            resourceId,
-            ip: req.ip,
-            timestamp: new Date(),
-            oldValues,
-            newValues: body,
-          };
+            affectedEntity: resource,
+            affectedRecordId: resourceId ?? "unknown",
+            ...(oldValues && typeof oldValues === "object"
+              ? { previousData: oldValues as Record<string, unknown> }
+              : {}),
+            ...(body && typeof body === "object"
+              ? { newData: body as Record<string, unknown> }
+              : {}),
+          });
 
-          // 7. Grava no MongoDB sem bloquear a resposta
-          void saveAudit(auditData).catch((error: unknown) => {
+          void saveAudit(auditLog).catch((error: unknown) => {
             console.error(
               "Erro ao salvar registro de auditoria:",
               error
@@ -124,7 +110,6 @@ export function createAuditMiddleware({
 
       }) as Response["json"];
 
-      // 8. Continua para o controller
       return next();
 
     } catch (error) {

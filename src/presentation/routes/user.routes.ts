@@ -26,6 +26,7 @@ import { FindUserUseCase } from "../../core/use-cases/user/FindUserUseCase.js";
 import { UpdateUserUseCase } from "../../core/use-cases/user/UpdateUserUseCase.js";
 import { ChangeUserRoleUseCase } from "../../core/use-cases/user/ChangeUserRoleUseCase.js";
 import { DeleteUserUseCase } from "../../core/use-cases/user/DeleteUserUseCase.js";
+import { getAuditCollection } from "../../infra/database/mongodb.js";
 
 const userRoutes = Router();
 
@@ -71,12 +72,16 @@ const deleteUserController = new DeleteUserController(deleteUserUseCase);
 // AUDIT MIDDLEWARE
 // ========================================
 
+const auditRepository = new MongoAuditLogRepository(
+  getAuditCollection()
+);
+
 const userAuditMiddleware = createAuditMiddleware({
   resource: "users",
 
   getOldValues: (id) => userRepository.findById(id),
 
-  saveAudit: (data) => MongoAuditLogRepository.create(data),
+  saveAudit: (data) => auditRepository.create(data),
 });
 
 // ========================================

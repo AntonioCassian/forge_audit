@@ -27,6 +27,7 @@ import { UpdateMachineUseCase } from "../../core/use-cases/equipment/update-mach
 import { DeleteMachineUseCase } from "../../core/use-cases/equipment/delete-machine.js";
 import { UpdateMachineStatusController } from "../controllers/machine/update-machine-status-controller.js";
 import { UpdateMachineStatusUseCase } from "../../core/use-cases/equipment/update-machine-status-use-case.js";
+import { getAuditCollection } from "../../infra/database/mongodb.js";
 
 const machineRoutes = Router();
 
@@ -83,12 +84,20 @@ const deleteMachineController = new DeleteMachineController(
 // AUDIT MIDDLEWARE
 // ========================================
 
+
+const auditRepository = new MongoAuditLogRepository(
+  getAuditCollection()
+);
+
 const machineAuditMiddleware = createAuditMiddleware({
   resource: "equipamento",
 
   getOldValues: (id) => machineRepository.findById(id),
 
-  saveAudit: (data) => MongoAuditLogRepository.create(data),
+  saveAudit: (data) =>
+    auditRepository.create(
+      data as Parameters<typeof auditRepository.create>[0]
+    ),
 });
 
 // ========================================
